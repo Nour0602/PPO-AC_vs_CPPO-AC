@@ -133,20 +133,8 @@ class ActorCritic(nn.Module):
                                                  graph_pool=graph_pool,
                                                  padded_nei=padded_nei,
                                                  adj=adj)
-        # print("h_pooled")
-        # print(h_pooled.size(1))
-        # print("h_nodes")
-        # print(h_nodes.size(0))
-        #print("self.n_j",   self.n_j)
         # prepare policy feature: concat omega feature with global feature
-        #print("candidate is:" , candidate)
-        #print("first part: unsqueeze reseult:,",candidate.unsqueeze(-1) )
-        #print("self.n_j:", self.n_j)
         dummy = candidate.unsqueeze(-1).expand(-1, self.n_j, h_nodes.size(-1))
-        # print("dummy is:", dummy.size(0))
-        # print("h_nodes.reshape(dummy.size(0), -1, dummy.size(-1)):", h_nodes.reshape(dummy.size(0), -1, dummy.size(-1)).size(1))
-        #print("dummy.size(0)", dummy.size(-2))
-        #print("h_nodes.reshape(dummy.size(0), -1, dummy.size(-1)):",  torch.gather(h_nodes.reshape(dummy.size(0), -1, dummy.size(-1)), 1, dummy).size())
         candidate_feature = torch.gather(h_nodes.reshape(dummy.size(0), -1, dummy.size(-1)), 1, dummy)
         #print("candidate_feature:", candidate_feature.size())
         
@@ -165,19 +153,11 @@ class ActorCritic(nn.Module):
         # concateFea = torch.cat((wkr, candidate_feature, h_pooled_repeated), dim=-1)
         concateFea = torch.cat((candidate_feature, h_pooled_repeated), dim=-1)
         candidate_scores = self.actor(concateFea)
-        #print("candidate_scores:", candidate_scores)
-
         #perform mask
         mask_reshape = mask.reshape(candidate_scores.size())
-        #print("mask_ reshape of the forward actor_critic")
-        #print(mask_reshape)
         candidate_scores[mask_reshape] = float('-inf')
-        
         pi = F.softmax(candidate_scores, dim=1)
-        #print("pi is:", pi[0][0])
         v = self.critic(h_pooled)
-        
-        #print("value of critic is (of forward actor_critic) :",   v)
         return pi, v
 
 if __name__ == '__main__':

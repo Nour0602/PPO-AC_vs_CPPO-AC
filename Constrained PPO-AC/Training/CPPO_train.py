@@ -2,7 +2,7 @@
 """
 Created on Sun Jan 30 23:24:42 2022
 
-@author: Nour_El_Houda 
+@author: Nour_El_Houda H
 """
 
 import torch

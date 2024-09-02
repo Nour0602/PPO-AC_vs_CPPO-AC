@@ -11,7 +11,6 @@ import math as m
 import random
 #from math import abs
 #Adjacency matrix transfers information of precedence between operations of the same job and meant to be processed on the same machine
-
 class SJSSP(gym.Env, EzPickle):
     def __init__(self,
                  n_j,
@@ -37,23 +36,16 @@ class SJSSP(gym.Env, EzPickle):
     
     @override
     def step(self,hour,n_jobs, action_idk, action_idv,eliminate_op,n_add):
-    #def step(self, action,eliminate_op):
-        #action is a int 0 - 224 for 15x15 for example
+        #action is a int 0 - 100 for Inst.10x10 for example
         #redundant action makes no effect
-        # print("self.partial_sol_sequeence:",self.partial_sol_sequeence)
-        # print("action_idk, action_idv:", action_idk, action_idv)
         if action_idv not in self.partial_sol_sequeence:
-          
             # UPDATE BASIC INFO:
             row = action_idv // self.number_of_machines
             col = action_idv % self.number_of_machines
-            #print("row,column:", row,col)
             self.step_count += 1
             self.finished_mark[row, col] = 1
             dur_a = self.dur[row, col]
-            #print("dur_a:", dur_a)
             self.partial_sol_sequeence.append(action_idv)
-            
             # UPDATE STATE:
             # permissible left shift
             startTime_a, flag = permissibleLeftShift(hour,n_jobs,a=action_idv, durMat=self.dur, mchMat=self.m, mchsStartTimes=self.mchsStartTimes, opIDsOnMchs=self.opIDsOnMchs)
@@ -70,47 +62,28 @@ class SJSSP(gym.Env, EzPickle):
                 
                 self.mask[action_idv // self.number_of_machines] = 1
                 if row in range(n_jobs):
-                    self.dev[row, col]=max(0,((self.temp1[row, col]-self.dev[row, col])))
-                    # self.dev[row, col]=0
-
-                    # if self.temp1[row, col]-self.dev[row, col]>=0:
-                    #     self.dev[row, col]=((self.temp1[row, col]-self.dev[row, col]))
-                    # else:
-                    #     self.dev[row, col]=0        
+                    self.dev[row, col]=max(0,((self.temp1[row, col]-self.dev[row, col]))) 
                         
             key_listed=list(self.idd.keys())
-            # print("key_listed at step:", key_listed)
             value_listed=list(self.idd.values())
-            # print("value list at step:", value_listed)
             candidate_change=[]
-            # print("self.omega at step is:", self.omega)
             for j in range(len(self.omega)):
             
                 # if self.omega[j] not in self.partial_sol_sequeence:
-                
                 # position1=value_listed.index(self.omega[j])
                 # candidate_change.append(key_listed[position1])
-                
-            # print("j is :", j)
-                # print("for j in range(len(self.omega)):j", j)
-               
                 if self.omega[j] not in value_listed:
                     # candidate_change.append(self.omega[j])
-                    # print("self.omega[j] in step:",self.omega[j] )
                     candidate_change.append(key_listed[value_listed.index(random.choice(value_listed))])
                 else: 
                     position1=value_listed.index(self.omega[j])
-                    # print("position1=value_listed.index(self.omega[j])", position1)
                     candidate_change.append(key_listed[position1])
-                # print("candidate_change at step:", candidate_change)
-      
-
+        
             self.omega_ch=np.asarray(candidate_change)
             self.omega_ch=self.omega_ch.astype(np.int64) 
 
             # adj matrix
             precd, succd = self.getNghbs(action_idv, self.opIDsOnMchs)
-            # print("action_idv,action precd,succd are: ",action_idv,precd, succd)
             self.adj[action_idk] = 0
             self.adj[action_idk, action_idk] = 1
             
@@ -123,20 +96,15 @@ class SJSSP(gym.Env, EzPickle):
                 pos_succ=value_listed.index(succd)
                 precd_idk=key_listed[pos_prec]
                 succd_idk=key_listed[pos_succ]
-                # print("action_idk,action_idv,pos_prec,pos_succ,precd_idk,succd_idk:",action_idk,action_idv,pos_prec,pos_succ,precd_idk,succd_idk)
                 self.adj[action_idk, precd_idk] = 1
                 self.adj[succd_idk, action_idk] = 1 
 
             if flag and precd != action_idv and succd != action_idv and (precd in value_listed) and (succd in value_listed): # Remove the old arc when a new operation inserts between two operations
                 self.adj[succd_idk, precd_idk] = 0
-            # print("self.adj first at step prepared:")
-            # print(self.adj)
         # prepare for return
-        #the change in fea 
-        
+        #The change in fea 
         fea = np.concatenate((self.LBs.reshape(-1, 1)/configs.et_normalize_coef,
                               self.finished_mark.reshape(-1, 1),self.dev.reshape(-1, 1)/configs.et_normalize_coef), axis=1)
-        #print("fea is like", fea)
         if eliminate_op!=[]:
                 #print("element is:", e)
             fea=np.delete(fea,eliminate_op,axis=0)
@@ -144,27 +112,21 @@ class SJSSP(gym.Env, EzPickle):
         s1=self.dev.sum(axis=0)
         sum1=s1[-1]
         # sum1=np.max(self.dev)
-
-        # print("sum1:", sum1)
-        # print("T_max is:", sum1)
         reward = -(0.75*sum1+0.25*self.LBs.max()) + self.max_endTime
         if reward == 0:
             reward = configs.rewardscale
             self.posRewards += reward
         self.max_endTime = 0.25*self.LBs.max()+0.75*sum1
-        #print("dictionary  is:" , self.idd)
-        
+
         return self.adj, self.dev,fea, reward, self.done(), self.omega_ch, self.mask
     @override
     def reset_add_eliminate(self,data,startTimeOnMchs,opIdsOnmchs,n_add,data_add,eliminate_op,ref_flag,final,final_dev):
         #eliminate op is a list containing operations to be eliminated
         #ref_flag indicates whether we take a ref_schedule at the training(one phase-training whenTRUE , otherwise double_phase_training)
-        #final== temp1: les temps de fin d'éxécution des tâches
+        #final== temp1: Operations end times
         
       
         self.m = data[-1]
-        # print("self.m is:", self.m)
-        
         self.dur = data[0].astype(np.single)
         
         self.dur_cp = np.copy(self.dur)
@@ -178,7 +140,6 @@ class SJSSP(gym.Env, EzPickle):
         ######si le job est fini normalement on met à jour le nbre de job?
         self.number_of_tasks = self.number_of_jobs * self.number_of_machines
         self.nb_nodes=self.number_of_tasks - len(eliminate_op)
-       
         # the task id for first column
         self.first_col = np.arange(start=0, stop=self.number_of_tasks, step=1).reshape(self.number_of_jobs, -1)[:, 0]
         # the task id for last column
@@ -189,7 +150,6 @@ class SJSSP(gym.Env, EzPickle):
         for i in range(len(data_add[0])):
           self.m =np.vstack((self.m,data_add[1][i]))
           self.dur = np.vstack((self.dur,data_add[0][i]))
-        #print("self.dur  shape after add:", self.dur.shape)
         self.dur_cp = np.copy(self.dur)
         self.mchsStartTimes = -configs.high * np.ones_like(self.dur.transpose(), dtype=np.int32)
         # Ops ID on machines
@@ -210,21 +170,13 @@ class SJSSP(gym.Env, EzPickle):
         conj_nei_up_stream = np.eye(self.number_of_tasks, k=-1, dtype=np.single)
         conj_nei_low_stream = np.eye(self.number_of_tasks, k=1, dtype=np.single)
 
-        # print("conj_nei_up_stream first:")
-        # print(conj_nei_up_stream)
-
         # first column does not have upper stream conj_nei
         conj_nei_up_stream[self.first_col] = 0
         # last column does not have lower stream conj_nei
         conj_nei_low_stream[self.last_col] = 0
 
-        # print("conj_nei_up_stream after:")
-        # print(conj_nei_up_stream)
-
         self_as_nei = np.eye(self.number_of_tasks, dtype=np.single)
         self.adj = self_as_nei + conj_nei_up_stream
-        # print("self.adj at rest:")
-        # print(self.adj)
         # initialize features:ADD
         self.LBs = np.cumsum(self.dur, axis=1, dtype=np.single)
 
@@ -241,7 +193,6 @@ class SJSSP(gym.Env, EzPickle):
     
         remaining_jobs=[i for i in range(self.number_of_tasks)]
         
-        
         job_id=[]
         for e in eliminate_op: 
 
@@ -254,11 +205,9 @@ class SJSSP(gym.Env, EzPickle):
               self.temp1[row_e, col_e]=final[row_e, col_e]
 
               mch_e=int(np.take(self.m,e)-1)
-            #   print("mch_e:", mch_e)
+
               ind1=np.where(opIdsOnmchs[int(mch_e)]==e)[0][0]
-            #   print("opIdsOnmchs:", opIdsOnmchs)
-            #   print('ind1=np.where(opIdsOnmchs[int(mch_e)]==e)[0][0]:', ind1,e)
-         
+  
               self.opIDsOnMchs[mch_e,ind1]=opIdsOnmchs[mch_e,ind1]
               self.mchsStartTimes[mch_e,ind1]=startTimeOnMchs[mch_e,ind1]
               
@@ -276,7 +225,6 @@ class SJSSP(gym.Env, EzPickle):
         
         #initializin fea tensorconsidering eliminated elements in fea tensor
         #normalization of tensor self.dev on 12/02/024
-
         fea = np.concatenate((self.LBs.reshape(-1, 1)/configs.et_normalize_coef,
                               # self.dur.reshape(-1, 1)/configs.high,
                               # wkr.reshape(-1, 1)/configs.wkr_normalize_coef,
@@ -288,23 +236,14 @@ class SJSSP(gym.Env, EzPickle):
         
         # Delete from ADJ,fea:
         if eliminate_op!=[]:
-            
             self.adj=np.delete(self.adj,eliminate_op,axis=0)
             self.adj=np.delete(self.adj,eliminate_op,axis=1)
             fea=np.delete(fea,eliminate_op ,axis=0)  
-        # print("self.adj:",len(self.adj))
-        # print("self.adj after elimination at reset:")
-        # print(self.adj)
-        
         #create the dictionary link
         zip_iterator=zip([i for i in range(len(remaining_jobs))],remaining_jobs)
-        # print("zip_iterator:", zip_iterator)
         self.idd=dict(zip_iterator)
-        # print("self.idd:", self.idd)
         key_listed=list(self.idd.keys())
         value_listed=list(self.idd.values())
-        # print("key_listed:",key_listed)
-        # print("value_listed in reset:", value_listed)
         #initialize feasible self.omega & self.omega_ch
         self.omega = self.first_col.astype(np.int64)
         
@@ -313,32 +252,23 @@ class SJSSP(gym.Env, EzPickle):
                 self.omega[i]+=1
                
         candidate_change=[]
-        # print("self.omega:",self.omega)
+       
         for j in range(len(self.omega)):
-            # print("j is :", j)
-            # print("for j in range(len(self.omega)):j", j)
-            # print("value_listed:", value_listed)
-            
             if self.omega[j] not in value_listed:
                 # candidate_change.append(self.omega[j])
-                # print("self.omega[j] in reset:",self.omega[j] )    
                 candidate_change.append(key_listed[value_listed.index(random.choice(value_listed))])
             else: 
                 position1=value_listed.index(self.omega[j])
-                # print("position1=value_listed.index(self.omega[j])", position1)
                 candidate_change.append(key_listed[position1])
-            # print("candidate_change at reset:", candidate_change)
-        
-                    
+           
         self.omega_ch=np.asarray(candidate_change)
         self.omega_ch=self.omega_ch.astype(np.int64)
         # print("self.omega_ch:", self.omega_ch)
        
         # initialize mask
-    
         self.mask = np.full(shape=self.number_of_jobs, fill_value=0, dtype=bool)
+        
         for i in job_id:
-            
             self.mask[i]=1
         
 

@@ -37,7 +37,7 @@ python PPO-AC/Test/PPO_test.py
 ```
 For CPPO-AC:
 ```bash
-python Constrained PPO-AC/Test/PPO_test.py
+python Constrained PPO-AC/Test/CPPO_test.py
 ```
 ## Citation
 If you use this code in your research, please cite:
